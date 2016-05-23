@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>TheWorld</name>
+    </assembly>
+    <members>
+        <member name="T:TheWorld.Controllers.Web.AppController">
+            <summary>
+            The app controller.
+            </summary>
+        </member>
+    </members>
+</doc>

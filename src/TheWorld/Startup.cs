@@ -10,8 +10,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TheWorld
 {
     using Microsoft.Extensions.Configuration;
+    using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.PlatformAbstractions;
 
+    using TheWorld.Models;
     using TheWorld.Services;
 
     public class Startup
@@ -32,6 +34,14 @@ namespace TheWorld
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddMvc();
+
+            services.AddLogging();
+
+            services.AddEntityFramework().AddSqlServer().AddDbContext<WorldContext>();
+
+            services.AddTransient<WorldContextSeedData>();
+            services.AddScoped<IWorldRepository, WorldRepository>();
+
 #if DEBUG
             services.AddScoped<IMailService, DebugMailService>();
 #else
@@ -40,8 +50,10 @@ namespace TheWorld
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app)
+        public void Configure(IApplicationBuilder app, WorldContextSeedData seeder, ILoggerFactory loggerFactory)
         {
+            loggerFactory.AddDebug(LogLevel.Warning);
+
             //            app.UseDefaultFiles(); Use MVC to do the routings now. We don't want to servce the index.html as the root accidentally.
             app.UseStaticFiles();
             //Search for the AppController and Index method by default. id is optional
@@ -53,6 +65,7 @@ namespace TheWorld
                             template: "{controller}/{action}/{id?}",
                             defaults: new { controller = "App", action = "Index" });
                     });
+            seeder.EnsureSeedData();
         }
 
         // Entry point for the application.
