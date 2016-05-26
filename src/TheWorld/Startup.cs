@@ -9,12 +9,19 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace TheWorld
 {
+    using AutoMapper;
+
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.PlatformAbstractions;
 
+    using Newtonsoft.Json.Serialization;
+
     using TheWorld.Models;
     using TheWorld.Services;
+    using TheWorld.ViewModels;
+
+    using IConfiguration = Microsoft.Extensions.Configuration.IConfiguration;
 
     public class Startup
     {
@@ -33,7 +40,12 @@ namespace TheWorld
         // For more information on how to configure your application, visit http://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc();
+            services.AddMvc()
+                .AddJsonOptions(
+                    opt =>
+                        {
+                            opt.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+                        });
 
             services.AddLogging();
 
@@ -54,7 +66,14 @@ namespace TheWorld
         {
             loggerFactory.AddDebug(LogLevel.Warning);
 
-            //            app.UseDefaultFiles(); Use MVC to do the routings now. We don't want to servce the index.html as the root accidentally.
+            Mapper.Initialize(
+                config =>
+                    {
+                        config.CreateMap<Trip, TripViewModel>().ReverseMap();
+                        config.CreateMap<Stop, StopViewModel>().ReverseMap();
+                    });
+
+            //app.UseDefaultFiles(); Use MVC to do the routings now. We don't want to servce the index.html as the root accidentally.
             app.UseStaticFiles();
             //Search for the AppController and Index method by default. id is optional
             app.UseMvc(
