@@ -49,16 +49,19 @@ namespace TheWorld
 
             services.AddLogging();
 
-            services.AddEntityFramework().AddSqlServer().AddDbContext<WorldContext>();
+            services.AddEntityFramework()
+                .AddSqlServer()
+                .AddDbContext<WorldContext>();
 
+            services.AddScoped<CoordService>();
             services.AddTransient<WorldContextSeedData>();
             services.AddScoped<IWorldRepository, WorldRepository>();
 
-#if DEBUG
+            #if DEBUG
             services.AddScoped<IMailService, DebugMailService>();
-#else
+            #else
             services.AddScoped<IMailService, RealMailService>();
-#endif
+            #endif
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

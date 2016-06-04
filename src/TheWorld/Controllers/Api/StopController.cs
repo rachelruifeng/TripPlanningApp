@@ -14,19 +14,23 @@ namespace TheWorld.Controllers.Api
     using Microsoft.Extensions.Logging;
 
     using TheWorld.Models;
+    using TheWorld.Services;
     using TheWorld.ViewModels;
 
     [Route("api/trips/{tripName}/stops")]
-    public class StopController :Controller
+    public class StopController : Controller
     {
         private IWorldRepository _repository;
 
-        private ILogger _logger;
+        private ILogger<StopController> _logger;
 
-        public StopController(IWorldRepository repository, ILogger logger)
+        private CoordService _coordService;
+
+        public StopController(IWorldRepository repository, ILogger<StopController> logger, CoordService coordService)
         {
             _repository = repository;
-            _logger = logger; 
+            _logger = logger;
+            _coordService = coordService;
         }
 
         [HttpGet("")]
@@ -37,16 +41,55 @@ namespace TheWorld.Controllers.Api
                 var results = this._repository.GetTripByName(tripName);
                 if (results == null)
                 {
-                    return Json(null); 
+                    return Json(null);
                 }
-                return Json(Mapper.Map<IEnumerable<StopViewModel>>(results.Stops));
+                return Json(Mapper.Map<IEnumerable<StopViewModel>>(results.Stops.OrderBy(s => s.Order)));
             }
             catch (Exception ex)
             {
-                this._logger.LogError($"Failed to get stops for trip {tripName}", ex);
+                _logger.LogError($"Failed to get stops for trip {tripName}", ex);
                 Response.StatusCode = (int)HttpStatusCode.BadRequest;
                 return Json("Error occurred finding trip name.");
             }
+        }
+
+        public async Task<JsonResult> Post(string tripName, [FromBody]StopViewModel vm)
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    // Map to the Entitiy 
+                    var newStop = Mapper.Map<Stop>(vm);
+                    // Looking up Geocoordinates
+                    var coordResult = await _coordService.LookUp(newStop.Name);
+
+                    if (!coordResult.Success)
+                    {
+                        Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                        Json(coordResult.Message);
+                    }
+                    newStop.Latitude = coordResult.Latitude;
+                    newStop.Longitude = coordResult.Longitude; 
+
+                    // Save to the Database
+                    _repository.AddStop(tripName, newStop);
+
+                    if (_repository.SaveAll())
+                    {
+                        Response.StatusCode = (int)HttpStatusCode.Created;
+                        return Json(Mapper.Map<StopViewModel>(newStop));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to save new stops", ex);
+                Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Json("Failed to save new stop.");
+            }
+            Response.StatusCode = (int)HttpStatusCode.BadRequest;
+            return Json("Validation failed on new stop.");
         }
     }
 }
