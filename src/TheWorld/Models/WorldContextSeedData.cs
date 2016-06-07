@@ -6,25 +6,41 @@ using System.Threading.Tasks;
 
 namespace TheWorld.Models
 {
+    using Microsoft.AspNet.Identity;
+
     public class WorldContextSeedData
     {
         private WorldContext _context;
 
-        public WorldContextSeedData(WorldContext context)
+        private UserManager<WorldUser> _userManager;
+
+        public WorldContextSeedData(WorldContext context, UserManager<WorldUser> userManager)
         {
             _context = context;
+            _userManager = userManager;
         }
 
-        public void EnsureSeedData()
+        public async Task EnsureSeedDataAsync()
         {
+            if (await _userManager.FindByEmailAsync("me@gmail.com") == null)
+            {
+                // Add the user.
+                var newUser = new WorldUser()
+                                  {
+                                      UserName = "rachel",
+                                      Email = "me@gmail.com"
+                                  };
+                await _userManager.CreateAsync(newUser, "P@ssw0rd!");
+            }
+
             if (!this._context.Trips.Any())
             {
-                //Add new Data 
+                // Add new Data 
                 var usTrip = new Trip()
                 {
                     Name = "US Trip",
                     Created = DateTime.UtcNow,
-                    UserName = " ",
+                    UserName = "rachel",
                     Stops = new List<Stop>()
                                 {
                                     new Stop()

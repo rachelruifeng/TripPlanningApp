@@ -9,8 +9,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace TheWorld
 {
+    using System.Net;
+
     using AutoMapper;
 
+    using Microsoft.AspNet.Authentication.Cookies;
+    using Microsoft.AspNet.Identity.EntityFramework;
+    using Microsoft.AspNet.Mvc;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.PlatformAbstractions;
@@ -40,12 +45,42 @@ namespace TheWorld
         // For more information on how to configure your application, visit http://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc()
+            services.AddMvc(
+                config => {
+#if !DEBUG
+                     config.Filters.Add(new RequireHttpsAttribute()); 
+#endif 
+                    })
                 .AddJsonOptions(
                     opt =>
                         {
                             opt.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
                         });
+
+            services.AddIdentity<WorldUser, IdentityRole>(
+                config =>
+                    {
+                        config.User.RequireUniqueEmail = true;
+                        config.Password.RequiredLength = 8;
+                        config.Cookies.ApplicationCookie.LoginPath = "/Auth/Login";
+                        config.Cookies.ApplicationCookie.Events = new CookieAuthenticationEvents()
+                        {
+                            OnRedirectToLogin = context =>
+                            {
+                                if (context.Request.Path.StartsWithSegments("/api")
+                                    && context.Response.StatusCode == (int)HttpStatusCode.OK)
+                                {
+                                    context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                                }
+                                else
+                                {
+                                    context.Response.Redirect(context.RedirectUri);
+                                }
+                                return Task.FromResult(0);
+                            }
+                        };
+                    })
+                    .AddEntityFrameworkStores<WorldContext>();
 
             services.AddLogging();
 
@@ -57,17 +92,22 @@ namespace TheWorld
             services.AddTransient<WorldContextSeedData>();
             services.AddScoped<IWorldRepository, WorldRepository>();
 
-            #if DEBUG
+#if DEBUG
             services.AddScoped<IMailService, DebugMailService>();
-            #else
+#else
             services.AddScoped<IMailService, RealMailService>();
-            #endif
+#endif
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, WorldContextSeedData seeder, ILoggerFactory loggerFactory)
+        public async void Configure(IApplicationBuilder app, WorldContextSeedData seeder, ILoggerFactory loggerFactory)
         {
             loggerFactory.AddDebug(LogLevel.Warning);
+
+            //app.UseDefaultFiles(); Use MVC to do the routings now. We don't want to servce the index.html as the root accidentally.
+            app.UseStaticFiles();
+
+            app.UseIdentity();
 
             Mapper.Initialize(
                 config =>
@@ -76,8 +116,6 @@ namespace TheWorld
                         config.CreateMap<Stop, StopViewModel>().ReverseMap();
                     });
 
-            //app.UseDefaultFiles(); Use MVC to do the routings now. We don't want to servce the index.html as the root accidentally.
-            app.UseStaticFiles();
             //Search for the AppController and Index method by default. id is optional
             app.UseMvc(
                 config =>
@@ -87,7 +125,7 @@ namespace TheWorld
                             template: "{controller}/{action}/{id?}",
                             defaults: new { controller = "App", action = "Index" });
                     });
-            seeder.EnsureSeedData();
+             await seeder.EnsureSeedDataAsync();
         }
 
         // Entry point for the application.
