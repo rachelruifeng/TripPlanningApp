@@ -92,17 +92,27 @@ namespace TheWorld
             services.AddTransient<WorldContextSeedData>();
             services.AddScoped<IWorldRepository, WorldRepository>();
 
-#if DEBUG
-            services.AddScoped<IMailService, DebugMailService>();
-#else
-            services.AddScoped<IMailService, RealMailService>();
-#endif
+//#if DEBUG
+//            services.AddScoped<IMailService, DebugMailService>();
+//#else
+//            services.AddScoped<IMailService, RealMailService>();
+//#endif
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public async void Configure(IApplicationBuilder app, WorldContextSeedData seeder, ILoggerFactory loggerFactory)
+        public async void Configure(IApplicationBuilder app, 
+            WorldContextSeedData seeder, 
+            ILoggerFactory loggerFactory,
+            IHostingEnvironment env)
         {
-            loggerFactory.AddDebug(LogLevel.Warning);
+            if (env.IsDevelopment())
+            {
+                loggerFactory.AddDebug(LogLevel.Information);
+            }
+            else
+            {
+                loggerFactory.AddDebug(LogLevel.Error);
+            }
 
             //app.UseDefaultFiles(); Use MVC to do the routings now. We don't want to servce the index.html as the root accidentally.
             app.UseStaticFiles();
